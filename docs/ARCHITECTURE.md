@@ -8,7 +8,7 @@ sequenceDiagram
     participant FE as React/Redux (ChatPanel)
     participant API as FastAPI /api/chat
     participant Graph as LangGraph StateGraph
-    participant LLM as Groq gemma2-9b-it
+    participant LLM as Groq llama-3.3-70b-versatile
     participant Tool as Tool (e.g. log_interaction)
     participant DB as Postgres/SQLite
 

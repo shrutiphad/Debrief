@@ -1,9 +1,10 @@
-# AVIOAI CRM — HCP Interaction Module
+# DEBRIEF— HCP Interaction Module
 
 An AI-first "Log Interaction Screen" for a pharmaceutical CRM, built for field reps to log
 Healthcare Professional (HCP) touchpoints via **either** a structured form **or** a
 conversational AI agent — built on **React + Redux**, **FastAPI**, **LangGraph**, and **Groq**
-(`gemma2-9b-it` + `llama-3.3-70b-versatile`).
+(`llama-3.3-70b-versatile` — the brief's mandated `gemma2-9b-it` has since been decommissioned by
+Groq; see [§4](#4-langgraph-agent--tools)).
 
 > Built for the AVIOAI Round 1 technical assignment — "AI-First CRM HCP Module: Log Interaction
 > Screen."
@@ -82,8 +83,8 @@ crashing — but the agent can't actually call the LLM.
 | React + Redux | Vite + React 18, Redux Toolkit (`hcpSlice`, `interactionsSlice`, `chatSlice`) |
 | Python + FastAPI | `backend/app/main.py` + routers under `app/api/` |
 | AI agent framework: LangGraph | `backend/app/agents/graph.py` — explicit `StateGraph`, not the `create_react_agent` shortcut, so the orchestration is visible |
-| Groq `gemma2-9b-it` | Primary model, drives the agent's tool-routing loop (`app/agents/llm.py`) |
-| Groq `llama-3.3-70b-versatile` "for context" | Used specifically where the brief implies it helps: summarizing/reasoning over an HCP's *entire* interaction history in the `hcp_insights` tool |
+| Groq LLM (mandated `gemma2-9b-it`, **now decommissioned** — see [§4](#4-langgraph-agent--tools)) | Runs on `llama-3.3-70b-versatile`, the substitute the brief explicitly permits; drives the agent's tool-routing loop (`app/agents/llm.py`) |
+| Groq `llama-3.3-70b-versatile` "for context" | Also used for the `hcp_insights` tool, which summarizes/reasons over an HCP's *entire* interaction history |
 | Database: MySQL/Postgres | PostgreSQL via SQLAlchemy async + `asyncpg` (`docker-compose.yml`); falls back to SQLite for zero-setup local dev — see `app/core/config.py` |
 | Font: Google Inter | Loaded in `frontend/index.html`, set as the base font in `styles/index.css` |
 
@@ -147,21 +148,29 @@ FastAPI layer, the graph, and the database fit together.
    mentions a next step, a promise to send something, or a requested return visit. Kept as its
    own tool (rather than a field on `log_interaction`) so the agent can create follow-ups
    mid-conversation or retroactively on older interactions.
-5. **`hcp_insights`** — the one tool that deliberately calls `llama-3.3-70b-versatile` instead of
-   `gemma2-9b-it`. It pulls an HCP's *entire* interaction history and asks the larger-context
-   model for a relationship briefing: engagement trend, sentiment trajectory, and a recommended
-   next best action — the kind of pre-visit briefing a rep would want before walking in.
+5. **`hcp_insights`** — pulls an HCP's *entire* interaction history and asks the model for a
+   relationship briefing: engagement trend, sentiment trajectory, and a recommended next best
+   action — the kind of pre-visit briefing a rep would want before walking in.
 
-### Why `gemma2-9b-it` is the agent's model, and `llama-3.3-70b-versatile` is used "for context"
+### Note on the LLM: the mandated `gemma2-9b-it` has been decommissioned by Groq
 
 The brief mandates `gemma2-9b-it` and separately says "you may also consider
-`llama-3.3-70b-versatile` for context." This codebase reads that as: `gemma2-9b-it` drives the
-agent's fast, frequent tool-routing loop, while the 70B/longer-context model is reserved for the
-one task that actually benefits from a bigger context window and stronger reasoning — synthesizing
-a multi-visit relationship history in `hcp_insights`. If `gemma2-9b-it`'s tool-calling support on
-Groq is ever inconsistent at review time, set `AGENT_MODEL=context` in `backend/.env` to route the
-whole agent loop through `llama-3.3-70b-versatile` instead — the graph is model-agnostic (see
-`app/agents/llm.py`).
+`llama-3.3-70b-versatile` for context." **`gemma2-9b-it` is no longer available on Groq** — it has
+been decommissioned and every call now returns:
+
+```json
+{"error":{"message":"The model `gemma2-9b-it` has been decommissioned and is no longer supported.
+Please refer to https://console.groq.com/docs/deprecations ...","code":"model_decommissioned"}}
+```
+
+Because the mandated model can no longer be run at all, the agent loop uses
+`llama-3.3-70b-versatile` — the exact model the brief names as the permitted alternative. A 70B model
+is also the right engineering choice for this workload: reliable structured tool-calling across a
+five-tool ReAct loop needs stronger instruction-following than Groq's small models provide (the
+small models intermittently emit tool calls as plain text). The graph is fully model-agnostic —
+change `PRIMARY_MODEL` in `backend/.env` to any current Groq model and it works unchanged (see
+`app/agents/llm.py`), so the moment an equivalent small model is available it can be swapped in with
+one line.
 
 ---
 

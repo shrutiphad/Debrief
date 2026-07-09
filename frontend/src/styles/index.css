@@ -146,7 +146,7 @@ p {
 }
 
 .brand-mark {
-  width: 30px;
+  width: 60px;
   height: 30px;
   border-radius: 8px;
   background: linear-gradient(135deg, var(--primary), var(--accent));

@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 
 const PIPELINE = [
   { key: "receive", label: "Rep message received" },
-  { key: "agent", label: "Agent reasoning · gemma2-9b-it" },
+  { key: "agent", label: "Agent reasoning · Groq LLM" },
   { key: "tools", label: "Tool execution · LangGraph ToolNode" },
   { key: "db", label: "CRM database write" },
   { key: "reply", label: "Agent response synthesized" },

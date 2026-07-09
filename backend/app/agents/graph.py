@@ -26,6 +26,8 @@ A `MemorySaver` checkpointer keys conversation state by `session_id`, so a
 rep's chat has continuity ("no, make it Tuesday not Wednesday") within a
 session without the frontend having to resend full history.
 """
+from datetime import date
+
 from langchain_core.messages import SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -54,7 +56,8 @@ def build_graph(db: AsyncSession):
     async def agent_node(state: AgentState) -> dict:
         messages = state["messages"]
         if not any(isinstance(m, SystemMessage) for m in messages):
-            messages = [SystemMessage(content=AGENT_SYSTEM_PROMPT), *messages]
+            system_prompt = AGENT_SYSTEM_PROMPT.format(today=date.today().isoformat())
+            messages = [SystemMessage(content=system_prompt), *messages]
         response = await llm_with_tools.ainvoke(messages)
         return {"messages": [response]}
 

@@ -1,19 +1,16 @@
 """
 Groq-backed LLM clients.
 
-Per the task brief, `gemma2-9b-it` is the mandatory model and drives the
-LangGraph agent's tool-routing loop. `llama-3.3-70b-versatile` is used
-wherever the brief says "for context" — i.e. tasks that benefit from a
-larger context window and stronger multi-step reasoning:
+`PRIMARY_MODEL` (llama-3.3-70b-versatile) drives the LangGraph agent's
+tool-routing loop — a 70B model is used here because reliable structured
+tool-calling across a 5-tool ReAct loop needs stronger instruction-following
+than a small model can give. `CONTEXT_MODEL` is used for longer-context
+reasoning / summarization tasks such as `hcp_insights`.
 
-  * summarizing long / rambling free-text or chat-derived notes
-  * `hcp_insights`, which reasons over an HCP's *entire* interaction
-    history to produce a relationship read + recommended next action
-
-If, at review time, `gemma2-9b-it` does not accept `bind_tools` on a given
-Groq API version, set AGENT_MODEL=context in the environment (see
-.env.example) to route the agent loop through llama-3.3-70b-versatile
-instead — the rest of the graph is model-agnostic.
+Both clients are configured with automatic retries and a request timeout so
+transient Groq rate-limit (429) / timeout blips are retried with backoff
+rather than surfacing to the rep as a hard failure. Set AGENT_MODEL=context
+to route the agent loop through CONTEXT_MODEL instead.
 """
 from functools import lru_cache
 
@@ -23,24 +20,33 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+# Robustness knobs shared by both clients. langchain-groq retries 429s / 5xx /
+# timeouts with exponential backoff up to max_retries before raising.
+_MAX_RETRIES = 3
+_REQUEST_TIMEOUT = 30.0  # seconds per attempt
+
 
 @lru_cache
 def get_primary_llm() -> ChatGroq:
-    """gemma2-9b-it — mandatory model, drives the agent's routing/tool-call loop."""
+    """PRIMARY_MODEL — drives the agent's routing/tool-call loop."""
     return ChatGroq(
         model=settings.PRIMARY_MODEL,
         api_key=settings.GROQ_API_KEY or "missing-key",
         temperature=settings.LLM_TEMPERATURE,
+        max_retries=_MAX_RETRIES,
+        request_timeout=_REQUEST_TIMEOUT,
     )
 
 
 @lru_cache
 def get_context_llm() -> ChatGroq:
-    """llama-3.3-70b-versatile — long-context reasoning & summarization."""
+    """CONTEXT_MODEL — long-context reasoning & summarization."""
     return ChatGroq(
         model=settings.CONTEXT_MODEL,
         api_key=settings.GROQ_API_KEY or "missing-key",
         temperature=settings.LLM_TEMPERATURE,
+        max_retries=_MAX_RETRIES,
+        request_timeout=_REQUEST_TIMEOUT,
     )
 
 

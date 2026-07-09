@@ -1,9 +1,9 @@
 """
 Tool: hcp_insights  (tool #5)
 
-The one tool that deliberately uses llama-3.3-70b-versatile instead of
-gemma2-9b-it — this is the "for context" use case the brief calls out.
-It pulls an HCP's *entire* interaction history (which can run long for a
+The one tool that deliberately uses CONTEXT_MODEL (llama-3.3-70b-versatile) —
+this is the "for context" use case the brief calls out. It pulls an HCP's
+*entire* interaction history (which can run long for a
 well-covered prescriber) and asks a larger-context model to produce a
 relationship read: engagement trend, sentiment trajectory, and a
 recommended next best action. This is what a rep would pull up right
