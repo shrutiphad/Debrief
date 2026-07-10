@@ -46,7 +46,7 @@ _checkpointer = MemorySaver()
 # keeps the full session, but re-sending all of it every turn burns free-tier tokens-per-
 # minute fast. Keep the most recent messages, always starting on a human turn so an
 # assistant tool-call is never split from its tool result (which the API would reject).
-_HISTORY_MAX_MESSAGES = 16
+_HISTORY_MAX_MESSAGES = 12
 
 
 def _should_continue(state: AgentState) -> str:

@@ -35,35 +35,17 @@ class LogInteractionInput(BaseModel):
         default_factory=lambda: date_type.today().isoformat(),
         description="ISO date (YYYY-MM-DD) the interaction happened. Default to today if not stated.",
     )
-    interaction_time: str | None = Field(default=None, description="Time of the interaction, HH:MM, if mentioned.")
-    attendees: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Other people present BESIDES the HCP themselves (e.g. a clinic nurse, a colleague). "
-            "Never put the HCP's own name here. Leave empty if only the HCP was present."
-        ),
-    )
-    raw_notes: str = Field(description="The rep's free-text description of what happened, verbatim.")
-    summary: str | None = Field(
-        default=None,
-        description=(
-            "A concise 1-2 sentence professional summary of the interaction that YOU write from the "
-            "rep's description. Plain text only — no preamble like 'Here is a summary'."
-        ),
-    )
+    interaction_time: str | None = Field(default=None, description="HH:MM if the rep states one; else omit (current time is filled automatically).")
+    attendees: list[str] = Field(default_factory=list, description="Others present besides the HCP (e.g. a nurse). Never the HCP themselves.")
+    raw_notes: str = Field(description="The rep's description of what happened, verbatim.")
+    summary: str | None = Field(default=None, description="Your concise 1-2 sentence summary. Plain text, no preamble.")
     products_discussed: list[str] = Field(default_factory=list, description="Product/brand names mentioned.")
-    samples_dropped: list[str] = Field(default_factory=list, description="Sample products left with the HCP, if any.")
-    materials_shared: list[str] = Field(default_factory=list, description="Marketing/clinical materials shared, if any.")
-    outcomes: str | None = Field(default=None, description="Key outcomes or agreements reached, if any.")
-    sentiment: str | None = Field(
-        default=None,
-        description=(
-            "The HCP's sentiment inferred from the rep's description: exactly 'positive', 'neutral', or "
-            "'negative'. If the rep gives no signal of how the HCP reacted, use 'neutral'."
-        ),
-    )
-    follow_up_required: bool = Field(default=False, description="True if the rep needs to take a next step.")
-    follow_up_notes: str | None = Field(default=None, description="What the follow-up is, if follow_up_required is true.")
+    samples_dropped: list[str] = Field(default_factory=list, description="Sample products left with the HCP.")
+    materials_shared: list[str] = Field(default_factory=list, description="Materials/decks shared.")
+    outcomes: str | None = Field(default=None, description="Key outcomes or agreements, if any.")
+    sentiment: str | None = Field(default=None, description="positive, neutral, or negative — inferred from the description.")
+    follow_up_required: bool = Field(default=False, description="True if a next step is needed.")
+    follow_up_notes: str | None = Field(default=None, description="What the follow-up is, if follow_up_required.")
 
 
 def make_log_interaction_tool(db: AsyncSession) -> StructuredTool:
@@ -76,12 +58,17 @@ def make_log_interaction_tool(db: AsyncSession) -> StructuredTool:
         if sentiment not in _VALID_SENTIMENT:
             sentiment = "neutral"
 
+        # Only pass through a time the rep actually stated. When it's absent we send null and
+        # let the frontend fill the *browser-local* current time — the server runs in UTC, so
+        # doing it here would log a time hours off from the rep's real local time.
+        interaction_time = (payload.interaction_time or "").strip() or None
+
         # The draft mirrors the fields the left-hand form renders, so the frontend
         # can drop it straight in. No LLM calls here — the agent already did the work.
         draft = {
             "interaction_type": payload.interaction_type,
             "interaction_date": payload.interaction_date,
-            "interaction_time": payload.interaction_time,
+            "interaction_time": interaction_time,
             "attendees": payload.attendees,
             "products_discussed": payload.products_discussed,
             "samples_dropped": payload.samples_dropped,

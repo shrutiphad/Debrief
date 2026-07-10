@@ -7,7 +7,7 @@ import { createInteraction } from "./interactionsSlice";
 export const emptyDraft = {
   interaction_type: "visit",
   interaction_date: new Date().toISOString().slice(0, 10),
-  interaction_time: "",
+  interaction_time: new Date().toTimeString().slice(0, 5), // HH:MM — auto-filled like the date
   attendees: [],
   products_discussed: [],
   samples_dropped: [],
@@ -49,7 +49,13 @@ const draftSlice = createSlice({
       for (const t of trace) {
         if (t.tool === "log_interaction" && t.output?.draft) {
           // log = fill the whole form from scratch
-          state.fields = mergeDefined({ ...emptyDraft }, t.output.draft);
+          const filled = mergeDefined({ ...emptyDraft }, t.output.draft);
+          // Auto-log the time alongside the date: if the rep didn't state a time, stamp the
+          // current browser-local time (the server is UTC, so we set it here to stay accurate).
+          if (!t.output.draft.interaction_time) {
+            filled.interaction_time = new Date().toTimeString().slice(0, 5);
+          }
+          state.fields = filled;
           state.dirty = true;
           state.lastTouchedBy = "log";
         } else if (t.tool === "edit_interaction" && t.output?.patch) {
