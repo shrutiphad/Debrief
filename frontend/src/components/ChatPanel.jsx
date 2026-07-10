@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { pushHumanMessage, sendChatMessage } from "../store/slices/chatSlice";
 import { fetchInteractions } from "../store/slices/interactionsSlice";
-import AgentTracePanel from "./AgentTracePanel";
 
 export default function ChatPanel() {
   const dispatch = useDispatch();
@@ -31,14 +30,13 @@ export default function ChatPanel() {
   };
 
   return (
-    <div className="chat-layout">
-      <div className="chat-panel">
+    <div className="chat-panel">
         <div className="chat-messages" ref={scrollRef}>
           {messages.length === 0 && (
             <div className="chat-empty">
-              Tell the agent what happened — e.g. “Just met {selectedHcp?.name || "the HCP"}, discussed Cardivax,
-              she was positive and wants samples next visit.” It will log the interaction, extract the details, and
-              confirm back to you.
+              Describe the visit — e.g. “Just met {selectedHcp?.name || "the HCP"}, discussed Cardivax, she was
+              positive and wants samples next visit.” The assistant fills the form on the left. Then correct it in
+              chat (“actually it was a call, sentiment negative”) and hit Log Interaction to save.
             </div>
           )}
           {messages.map((m, i) => (
@@ -73,8 +71,6 @@ export default function ChatPanel() {
             Send
           </button>
         </div>
-      </div>
-      <AgentTracePanel />
     </div>
   );
 }

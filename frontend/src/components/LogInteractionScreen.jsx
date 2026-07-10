@@ -1,20 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchInteractions } from "../store/slices/interactionsSlice";
 import { resetSession } from "../store/slices/chatSlice";
+import { clearDraft } from "../store/slices/draftSlice";
 import StructuredForm from "./StructuredForm";
 import ChatPanel from "./ChatPanel";
+import AgentTracePanel from "./AgentTracePanel";
 import InteractionHistory from "./InteractionHistory";
 
 export default function LogInteractionScreen() {
   const dispatch = useDispatch();
   const selectedHcp = useSelector((s) => s.hcps.items.find((h) => h.id === s.hcps.selectedId));
-  const [mode, setMode] = useState("chat");
 
   useEffect(() => {
     if (selectedHcp) {
       dispatch(fetchInteractions(selectedHcp.id));
       dispatch(resetSession());
+      dispatch(clearDraft());
     }
   }, [selectedHcp?.id, dispatch]);
 
@@ -24,26 +26,25 @@ export default function LogInteractionScreen() {
 
   return (
     <div>
-      <div className="content-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <div className="content-title">Log HCP Interaction — {selectedHcp.name}</div>
-          <div className="content-sub">
-            {selectedHcp.specialty} · {selectedHcp.institution} · {selectedHcp.city}
-          </div>
-        </div>
-        <div className="mode-toggle">
-          <button className={mode === "chat" ? "active" : ""} onClick={() => setMode("chat")}>
-            Conversational
-          </button>
-          <button className={mode === "structured" ? "active" : ""} onClick={() => setMode("structured")}>
-            Structured Form
-          </button>
+      <div className="content-header">
+        <div className="content-title">Log HCP Interaction — {selectedHcp.name}</div>
+        <div className="content-sub">
+          {selectedHcp.specialty} · {selectedHcp.institution} · {selectedHcp.city}
         </div>
       </div>
 
-      {mode === "chat" ? <ChatPanel /> : <StructuredForm />}
+      {/* Split screen: AI-driven form on the left, assistant chat on the right. */}
+      <div className="split-screen">
+        <StructuredForm />
+        <div className="chat-column">
+          <ChatPanel />
+          <AgentTracePanel />
+        </div>
+      </div>
 
-      <InteractionHistory />
+      <div className="section-gap">
+        <InteractionHistory />
+      </div>
     </div>
   );
 }

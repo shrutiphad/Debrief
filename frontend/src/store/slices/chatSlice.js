@@ -42,12 +42,11 @@ const chatSlice = createSlice({
         state.status = "idle";
         state.messages.push({ role: "agent", content: action.payload.reply });
         state.toolTrace = action.payload.tool_trace || [];
-        const touched = state.toolTrace.find((t) =>
-          ["log_interaction", "edit_interaction", "schedule_followup"].includes(t.tool)
-        );
+        // log/edit only fill the draft form (no DB write); a follow-up does persist,
+        // so refresh history when one is scheduled.
+        const touched = state.toolTrace.find((t) => t.tool === "schedule_followup");
         if (touched) {
-          state.lastInteractionTouched =
-            touched.output?.interaction_id || touched.output?.follow_up_id || Date.now();
+          state.lastInteractionTouched = touched.output?.follow_up_id || Date.now();
         }
       })
       .addCase(sendChatMessage.rejected, (state, action) => {

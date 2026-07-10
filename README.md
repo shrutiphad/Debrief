@@ -13,12 +13,16 @@ Groq; see [§4](#4-langgraph-agent--tools)).
 
 ## 1. What this is
 
-A rep can describe a visit the way they'd tell a colleague — *"Just saw Dr. Mehta, discussed
-Cardivax, she was positive and wants samples next time"* — and a LangGraph agent turns that into
-a correctly structured CRM record: it extracts the products, samples, sentiment, and follow-up
-from free text, writes it to the database, and confirms back in plain language. The same data can
-also be entered by hand through a structured form, and both paths get the same LLM-generated
-summary and sentiment enrichment, so the CRM record looks identical either way.
+The Log Interaction screen is a **split screen**: the **Interaction Details form on the left**, and
+an **AI assistant chat on the right**. The rep never types into the form — they describe the visit
+to the assistant the way they'd tell a colleague — *"Just saw Dr. Mehta, discussed Cardivax, she
+was positive and wants samples next time"* — and the LangGraph agent **fills the form on the left**
+for them: it extracts interaction type, products, samples, materials and follow-up, and infers a
+summary and sentiment. If something's wrong, the rep corrects it in chat — *"actually it was a
+call, and the sentiment was negative"* — and the agent updates **only those fields**, leaving the
+rest as they were. The rep reviews the filled form and clicks **Log Interaction** to save it to the
+database. This is the video's core requirement: the AI drives the form; the form is not filled by
+hand.
 
 **Two entry modes, one data model:**
 
@@ -79,7 +83,7 @@ crashing — but the agent can't actually call the LLM.
 
 | Requirement | Implementation |
 |---|---|
-| Structured form **and** conversational chat | `LogInteractionScreen.jsx` toggles between `StructuredForm.jsx` and `ChatPanel.jsx` |
+| Structured form **and** conversational chat | Split screen: `StructuredForm.jsx` (AI-filled, left) beside `ChatPanel.jsx` (assistant, right) in `LogInteractionScreen.jsx`. The chat fills/edits the form via the log/edit tools; the rep saves it. |
 | React + Redux | Vite + React 18, Redux Toolkit (`hcpSlice`, `interactionsSlice`, `chatSlice`) |
 | Python + FastAPI | `backend/app/main.py` + routers under `app/api/` |
 | AI agent framework: LangGraph | `backend/app/agents/graph.py` — explicit `StateGraph`, not the `create_react_agent` shortcut, so the orchestration is visible |
@@ -131,17 +135,18 @@ FastAPI layer, the graph, and the database fit together.
 
 ### The 5 tools (`app/agents/tools/`)
 
-1. **`log_interaction`** *(mandatory)* — creates a new `Interaction` row. The agent extracts the
-   arguments (HCP, type, products, samples, materials, follow-up) from the rep's free text itself
-   before calling this tool; the tool then makes two further focused LLM calls of its own —
-   summarization (`SUMMARY_EXTRACTION_PROMPT`) and sentiment classification
-   (`SENTIMENT_PROMPT`) — over the raw notes, so *what* gets extracted and *how it's written up*
-   are both LLM-driven, per the brief's "potentially using the LLM for summarization, entity
-   extraction" note.
-2. **`edit_interaction`** *(mandatory)* — patches an already-logged interaction ("actually she
-   also asked about pediatric dosing", "wrong date"). Only changed fields are touched, and every
-   edit is appended to an `edit_history` audit trail (timestamp, reason, before/after) that the
-   frontend surfaces on the history table.
+1. **`log_interaction`** *(mandatory)* — **fills the left-hand form** from the rep's description.
+   The agent extracts the arguments (type, products, samples, materials, follow-up) from the free
+   text itself before calling this tool; the tool then makes two further focused LLM calls of its
+   own — summarization (`SUMMARY_EXTRACTION_PROMPT`) and sentiment classification
+   (`SENTIMENT_PROMPT`) — so *what* gets extracted and *how it's written up* are both LLM-driven,
+   per the brief's "potentially using the LLM for summarization, entity extraction" note. It
+   **stages** the fields into the form (returns a `draft`); it does not save — the rep clicks
+   **Log Interaction** to persist via `POST /interactions`.
+2. **`edit_interaction`** *(mandatory)* — **updates the form the rep is reviewing** ("actually it
+   was a call", "sentiment was negative", "add pediatric dosing to topics"). It returns a `patch`
+   of **only the changed fields**, which the frontend merges into the current draft, so every
+   other field stays exactly as it was.
 3. **`search_interactions`** — looks up past interactions (by HCP and/or keyword) so the agent can
    ground an edit ("the visit last week") or answer "what did we last discuss with Dr. X."
 4. **`schedule_followup`** — creates a follow-up task tied to an interaction whenever the rep

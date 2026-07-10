@@ -1,194 +1,139 @@
-import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createInteraction } from "../store/slices/interactionsSlice";
+import { clearDraft } from "../store/slices/draftSlice";
 import TagInput from "./TagInput";
 
-const INTERACTION_TYPES = [
-  { value: "visit", label: "In-person visit" },
-  { value: "call", label: "Phone call" },
-  { value: "email", label: "Email" },
-  { value: "conference", label: "Conference / event" },
-  { value: "sample_drop", label: "Sample drop" },
-];
-
-const emptyForm = {
-  interaction_type: "visit",
-  interaction_date: new Date().toISOString().slice(0, 10),
-  interaction_time: new Date().toTimeString().slice(0, 5),
-  attendees: [],
-  products_discussed: [],
-  samples_dropped: [],
-  materials_shared: [],
-  topics_discussed: "",
-  outcomes: "",
-  sentiment: null, // null = let the AI infer it from Topics Discussed
-  follow_up_required: false,
-  follow_up_notes: "",
+const INTERACTION_TYPE_LABELS = {
+  visit: "In-person visit",
+  call: "Phone call",
+  email: "Email",
+  conference: "Conference / event",
+  sample_drop: "Sample drop",
 };
 
 const SENTIMENTS = ["positive", "neutral", "negative"];
 
-export default function StructuredForm({ onLogged }) {
+// The Interaction Details form. Per the task, the rep does NOT fill this by hand —
+// the AI assistant on the right fills and edits it via the log/edit tools. The fields
+// are therefore rendered read-only; the rep only reviews and saves.
+export default function StructuredForm() {
   const dispatch = useDispatch();
   const selectedHcpId = useSelector((s) => s.hcps.selectedId);
   const submitStatus = useSelector((s) => s.interactions.submitStatus);
-  const [form, setForm] = useState(emptyForm);
+  const { fields, dirty, lastTouchedBy } = useSelector((s) => s.draft);
 
-  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedHcpId) return;
-    const result = await dispatch(createInteraction({ ...form, hcp_id: selectedHcpId, channel: "structured" }));
-    if (result.meta.requestStatus === "fulfilled") {
-      setForm(emptyForm);
-      onLogged?.();
-    }
+  const handleSave = async () => {
+    if (!selectedHcpId || !dirty) return;
+    const result = await dispatch(
+      createInteraction({ ...fields, hcp_id: selectedHcpId, channel: "chat" })
+    );
+    // draftSlice clears the form on createInteraction.fulfilled
+    return result;
   };
 
   return (
-    <form className="panel" onSubmit={handleSubmit}>
-      <div className="panel-title">Interaction Details</div>
+    <div className="panel form-panel">
+      <div className="panel-title">
+        Interaction Details
+        <span className={`ai-driven-pill ${lastTouchedBy ? "active" : ""}`}>
+          {lastTouchedBy ? "✦ Updated by AI" : "✦ AI-filled"}
+        </span>
+      </div>
+      <p className="form-hint-lead">
+        Don't type here — describe the visit to the assistant on the right and it fills this form.
+      </p>
 
       <div className="form-grid">
         <div className="field">
           <label>Interaction Type</label>
-          <select value={form.interaction_type} onChange={(e) => set({ interaction_type: e.target.value })}>
-            {INTERACTION_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <input type="text" value={INTERACTION_TYPE_LABELS[fields.interaction_type] || fields.interaction_type} readOnly />
         </div>
 
         <div className="field">
           <label>Date</label>
-          <input
-            type="date"
-            value={form.interaction_date}
-            onChange={(e) => set({ interaction_date: e.target.value })}
-          />
+          <input type="text" value={fields.interaction_date || ""} readOnly />
         </div>
 
         <div className="field">
           <label>Time</label>
-          <input
-            type="text"
-            placeholder="HH:MM"
-            value={form.interaction_time}
-            onChange={(e) => set({ interaction_time: e.target.value })}
-          />
+          <input type="text" value={fields.interaction_time || "—"} readOnly />
         </div>
 
         <div className="field">
           <label>Attendees</label>
-          <TagInput
-            values={form.attendees}
-            onChange={(v) => set({ attendees: v })}
-            placeholder="Anyone else present…"
-          />
+          <TagInput values={fields.attendees || []} readOnly />
         </div>
 
         <div className="field span-2">
           <label>
-            Topics Discussed <span className="hint">— also used by the AI to generate the summary &amp; sentiment</span>
+            Topics Discussed <span className="hint">— summarized by the AI</span>
           </label>
-          <textarea
-            placeholder="Key discussion points…"
-            value={form.topics_discussed}
-            onChange={(e) => set({ topics_discussed: e.target.value })}
-          />
+          <textarea value={fields.topics_discussed || ""} readOnly placeholder="—" />
         </div>
 
         <div className="field span-2">
           <label>Outcomes</label>
-          <textarea
-            placeholder="Key outcomes or agreements…"
-            value={form.outcomes}
-            onChange={(e) => set({ outcomes: e.target.value })}
-          />
+          <textarea value={fields.outcomes || ""} readOnly placeholder="—" />
         </div>
 
         <div className="field span-2">
           <label>
-            Observed / Inferred HCP Sentiment <span className="hint">— leave unset to let the AI infer it</span>
+            HCP Sentiment <span className="hint">— inferred by the AI</span>
           </label>
           <div className="sentiment-row">
             {SENTIMENTS.map((s) => (
-              <button
-                type="button"
-                key={s}
-                className={`sentiment-option ${form.sentiment === s ? `selected ${s}` : ""}`}
-                onClick={() => set({ sentiment: form.sentiment === s ? null : s })}
-              >
+              <div key={s} className={`sentiment-option ${fields.sentiment === s ? `selected ${s}` : ""}`}>
                 {s[0].toUpperCase() + s.slice(1)}
-              </button>
+              </div>
             ))}
           </div>
         </div>
 
         <div className="field span-2">
           <label>Products Discussed</label>
-          <TagInput
-            values={form.products_discussed}
-            onChange={(v) => set({ products_discussed: v })}
-            placeholder="Type a product name and press Enter…"
-          />
+          <TagInput values={fields.products_discussed || []} readOnly />
         </div>
 
         <div className="field">
           <label>Samples Distributed</label>
-          <TagInput
-            values={form.samples_dropped}
-            onChange={(v) => set({ samples_dropped: v })}
-            placeholder="e.g. Cardivax 10mg"
-          />
+          <TagInput values={fields.samples_dropped || []} readOnly />
         </div>
 
         <div className="field">
           <label>Materials Shared</label>
-          <TagInput
-            values={form.materials_shared}
-            onChange={(v) => set({ materials_shared: v })}
-            placeholder="e.g. Efficacy deck"
-          />
+          <TagInput values={fields.materials_shared || []} readOnly />
         </div>
 
         <div className="field span-2">
           <div className="checkbox-row">
-            <input
-              type="checkbox"
-              id="follow-up-required"
-              checked={form.follow_up_required}
-              onChange={(e) => set({ follow_up_required: e.target.checked })}
-            />
+            <input type="checkbox" id="follow-up-required" checked={!!fields.follow_up_required} readOnly disabled />
             <label htmlFor="follow-up-required" style={{ fontWeight: 500 }}>
               Follow-up required
             </label>
           </div>
         </div>
 
-        {form.follow_up_required && (
+        {fields.follow_up_required && (
           <div className="field span-2">
             <label>Follow-up Notes</label>
-            <textarea
-              placeholder="What needs to happen next…"
-              value={form.follow_up_notes}
-              onChange={(e) => set({ follow_up_notes: e.target.value })}
-            />
+            <textarea value={fields.follow_up_notes || ""} readOnly placeholder="—" />
           </div>
         )}
       </div>
 
       <div className="form-actions">
-        <button type="button" className="btn btn-ghost" onClick={() => setForm(emptyForm)}>
+        <button type="button" className="btn btn-ghost" onClick={() => dispatch(clearDraft())} disabled={!dirty}>
           Clear
         </button>
-        <button type="submit" className="btn btn-primary" disabled={!selectedHcpId || submitStatus === "loading"}>
-          {submitStatus === "loading" ? "Logging…" : "Log Interaction"}
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={!selectedHcpId || !dirty || submitStatus === "loading"}
+        >
+          {submitStatus === "loading" ? "Saving…" : "Log Interaction"}
         </button>
       </div>
-    </form>
+    </div>
   );
 }

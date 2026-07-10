@@ -1,25 +1,23 @@
 """
 Tool: edit_interaction  (mandatory tool #2)
 
-Patches a previously logged interaction. Reps rarely get everything right in
-one pass ("actually add that she asked about pediatric dosing", "wrong date,
-it was Tuesday") — this tool applies a partial update and keeps an audit
-trail (`edit_history`) of every change, which the frontend surfaces on the
-interaction detail view for compliance traceability.
-"""
-from datetime import date as date_type, datetime
+Updates the Interaction Details form the rep is reviewing, before it's saved.
+This is the video's second mandatory flow: the form is filled, the rep spots a
+mistake ("actually the sentiment was negative, and it was a call not a visit"),
+and instead of clicking the form they tell the agent — this tool returns ONLY
+the changed fields as a patch, and the frontend merges it into the current
+draft so every other field is left exactly as it was.
 
+Like `log_interaction`, this stages changes into the form rather than writing to
+the database; persistence happens when the rep clicks "Log Interaction".
+"""
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.models import Interaction
 
 
 class EditInteractionInput(BaseModel):
-    interaction_id: str = Field(description="Id of the interaction to modify.")
-    interaction_type: str | None = None
+    interaction_type: str | None = Field(default=None, description="One of: visit, call, email, conference, sample_drop.")
     interaction_date: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
     interaction_time: str | None = None
     attendees: list[str] | None = None
@@ -28,53 +26,35 @@ class EditInteractionInput(BaseModel):
     materials_shared: list[str] | None = None
     topics_discussed: str | None = None
     outcomes: str | None = None
-    sentiment: str | None = Field(default=None, description="Manual override: positive, neutral, or negative.")
+    sentiment: str | None = Field(default=None, description="positive, neutral, or negative.")
     follow_up_required: bool | None = None
     follow_up_notes: str | None = None
     edit_reason: str = Field(description="Short reason for the edit, taken from what the rep said.")
 
 
 def make_edit_interaction_tool(db: AsyncSession) -> StructuredTool:
+    # `db` is unused (this tool patches the in-progress form draft, not a saved row).
     async def _run(**kwargs) -> dict:
         payload = EditInteractionInput(**kwargs)
 
-        result = await db.execute(select(Interaction).where(Interaction.id == payload.interaction_id))
-        interaction = result.scalar_one_or_none()
-        if interaction is None:
-            return {"status": "error", "message": f"No interaction found with id {payload.interaction_id}"}
-
-        changed_fields = {}
-        patch = payload.model_dump(exclude={"interaction_id", "edit_reason"}, exclude_none=True)
-        for field, value in patch.items():
-            if field == "interaction_date":
-                value = date_type.fromisoformat(value)
-            old_value = getattr(interaction, field)
-            if old_value != value:
-                changed_fields[field] = {"from": str(old_value), "to": str(value)}
-                setattr(interaction, field, value)
-
-        if changed_fields:
-            history = list(interaction.edit_history or [])
-            history.append(
-                {
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reason": payload.edit_reason,
-                    "changes": changed_fields,
-                }
-            )
-            interaction.edit_history = history
-            await db.commit()
-            await db.refresh(interaction)
+        # Only the fields the rep actually asked to change — everything else is left
+        # untouched when the frontend merges this into the current draft.
+        patch = payload.model_dump(exclude={"edit_reason"}, exclude_none=True)
 
         return {
-            "interaction_id": interaction.id,
-            "fields_changed": list(changed_fields.keys()),
-            "status": "updated" if changed_fields else "no_changes",
+            "status": "edited" if patch else "no_changes",
+            "patch": patch,
+            "fields_changed": list(patch.keys()),
+            "edit_reason": payload.edit_reason,
         }
 
     return StructuredTool.from_function(
         name="edit_interaction",
-        description="Patch fields on an already-logged interaction. Only pass the fields that changed.",
+        description=(
+            "Update fields on the Interaction Details form the rep is reviewing. Pass ONLY the fields "
+            "that changed — everything else stays as it is. Use this whenever the rep corrects or adds "
+            "to what you already put in the form."
+        ),
         args_schema=EditInteractionInput,
         coroutine=_run,
     )

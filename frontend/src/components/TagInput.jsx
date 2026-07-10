@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function TagInput({ values, onChange, placeholder }) {
+export default function TagInput({ values, onChange, placeholder, readOnly = false }) {
   const [draft, setDraft] = useState("");
 
   const commit = () => {
@@ -10,6 +10,23 @@ export default function TagInput({ values, onChange, placeholder }) {
   };
 
   const remove = (tag) => onChange(values.filter((t) => t !== tag));
+
+  // Read-only: the AI fills these fields, the rep doesn't type into them.
+  if (readOnly) {
+    return (
+      <div className="tag-input-row readonly">
+        {values.length === 0 ? (
+          <span className="tag-empty">—</span>
+        ) : (
+          values.map((tag) => (
+            <span className="tag-chip" key={tag}>
+              {tag}
+            </span>
+          ))
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="tag-input-row">

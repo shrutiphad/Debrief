@@ -1,17 +1,20 @@
 """
 Tool: log_interaction  (mandatory tool #1)
 
-Creates a new Interaction record for an HCP. This is the primary entry point
-for the conversational side of the Log Interaction screen: the rep describes
-what happened in plain language, and this tool is responsible for turning
-that into a structured row — using the LLM for two things the brief calls
-out explicitly:
+Fills the "Interaction Details" form on the left of the Log Interaction screen
+from the rep's plain-language description — this is the conversational,
+AI-drives-the-form flow the task video requires: the rep never types into the
+form, they describe the visit and this tool extracts the structured fields.
 
-  1. Summarization — a clean 1-3 sentence professional summary of raw_notes.
-  2. Entity extraction — the *arguments to this tool itself* (products,
-     samples, materials, follow-up flag) are entities the agent's LLM
-     extracts from the rep's free text before ever calling this function.
-     The tool then does a second, focused extraction pass for sentiment.
+It does NOT write to the database. It *stages* a draft that the frontend renders
+into the form; the rep reviews it (and can ask the agent to correct it via
+`edit_interaction`) and then clicks "Log Interaction" to persist. The LLM is
+used for the two things the brief calls out explicitly:
+
+  1. Entity extraction — interaction type, products, samples, materials, dates,
+     follow-up flag are extracted by the agent's LLM into this tool's arguments.
+  2. Summarization + sentiment — a focused second pass turns the raw description
+     into a clean Topics-Discussed summary and infers HCP sentiment.
 """
 from datetime import date as date_type
 
@@ -21,11 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.llm import get_primary_llm
 from app.agents.prompts import SENTIMENT_PROMPT, SUMMARY_EXTRACTION_PROMPT
-from app.db.models import Interaction
 
 
 class LogInteractionInput(BaseModel):
-    hcp_id: str = Field(description="The internal id of the HCP this interaction is with.")
     interaction_type: str = Field(
         default="visit",
         description="One of: visit, call, email, conference, sample_drop.",
@@ -53,7 +54,7 @@ async def _summarize(raw_notes: str) -> str:
         )
         return resp.content.strip()
     except Exception:
-        # Enrichment failing shouldn't block the log from being saved — fall back to the raw notes.
+        # Enrichment failing shouldn't block the form from being filled — fall back to the raw notes.
         return raw_notes
 
 
@@ -70,46 +71,37 @@ async def _sentiment(raw_notes: str) -> str:
 
 
 def make_log_interaction_tool(db: AsyncSession) -> StructuredTool:
+    # `db` is unused here (this tool stages a draft rather than persisting) but the
+    # factory signature is kept uniform with the other DB-backed tools.
     async def _run(**kwargs) -> dict:
         payload = LogInteractionInput(**kwargs)
 
         summary, sentiment = await _summarize(payload.raw_notes), await _sentiment(payload.raw_notes)
 
-        interaction = Interaction(
-            hcp_id=payload.hcp_id,
-            interaction_type=payload.interaction_type,
-            channel="chat",
-            interaction_date=date_type.fromisoformat(payload.interaction_date),
-            interaction_time=payload.interaction_time,
-            attendees=payload.attendees,
-            products_discussed=payload.products_discussed,
-            samples_dropped=payload.samples_dropped,
-            materials_shared=payload.materials_shared,
-            topics_discussed=summary,
-            outcomes=payload.outcomes,
-            raw_notes=payload.raw_notes,
-            summary=summary,
-            sentiment=sentiment,
-            follow_up_required=payload.follow_up_required,
-            follow_up_notes=payload.follow_up_notes,
-        )
-        db.add(interaction)
-        await db.commit()
-        await db.refresh(interaction)
-
-        return {
-            "interaction_id": interaction.id,
-            "hcp_id": interaction.hcp_id,
-            "summary": summary,
+        # The draft object mirrors the fields the left-hand form renders, so the
+        # frontend can drop it straight into the form.
+        draft = {
+            "interaction_type": payload.interaction_type,
+            "interaction_date": payload.interaction_date,
+            "interaction_time": payload.interaction_time,
+            "attendees": payload.attendees,
+            "products_discussed": payload.products_discussed,
+            "samples_dropped": payload.samples_dropped,
+            "materials_shared": payload.materials_shared,
+            "topics_discussed": summary,
+            "outcomes": payload.outcomes,
             "sentiment": sentiment,
-            "follow_up_required": interaction.follow_up_required,
+            "follow_up_required": payload.follow_up_required,
+            "follow_up_notes": payload.follow_up_notes,
         }
+        return {"status": "staged", "draft": draft}
 
     return StructuredTool.from_function(
         name="log_interaction",
         description=(
-            "Log a new HCP interaction. Call this once you know which HCP, what happened, "
-            "and have extracted products/samples/materials/follow-up from the rep's message."
+            "Fill the Interaction Details form from the rep's description of a visit. Extract the "
+            "interaction type, date, products/samples/materials, and follow-up, and infer a summary "
+            "and sentiment. This fills the form for the rep to review and save — it does not save itself."
         ),
         args_schema=LogInteractionInput,
         coroutine=_run,
