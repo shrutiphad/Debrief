@@ -1,6 +1,7 @@
 import { useDispatch, useSelector } from "react-redux";
 import { createInteraction } from "../store/slices/interactionsSlice";
 import { clearDraft } from "../store/slices/draftSlice";
+import ReadOnlyField from "./ReadOnlyField";
 import TagInput from "./TagInput";
 
 const INTERACTION_TYPE_LABELS = {
@@ -14,21 +15,18 @@ const INTERACTION_TYPE_LABELS = {
 const SENTIMENTS = ["positive", "neutral", "negative"];
 
 // The Interaction Details form. Per the task, the rep does NOT fill this by hand —
-// the AI assistant on the right fills and edits it via the log/edit tools. The fields
-// are therefore rendered read-only; the rep only reviews and saves.
+// the AI assistant fills and edits it via the log/edit tools, so every field is
+// display-only. The rep only reviews and saves.
 export default function StructuredForm() {
   const dispatch = useDispatch();
   const selectedHcpId = useSelector((s) => s.hcps.selectedId);
   const submitStatus = useSelector((s) => s.interactions.submitStatus);
   const { fields, dirty, lastTouchedBy } = useSelector((s) => s.draft);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!selectedHcpId || !dirty) return;
-    const result = await dispatch(
-      createInteraction({ ...fields, hcp_id: selectedHcpId, channel: "chat" })
-    );
+    dispatch(createInteraction({ ...fields, hcp_id: selectedHcpId, channel: "chat" }));
     // draftSlice clears the form on createInteraction.fulfilled
-    return result;
   };
 
   return (
@@ -36,50 +34,39 @@ export default function StructuredForm() {
       <div className="panel-title">
         Interaction Details
         <span className={`ai-driven-pill ${lastTouchedBy ? "active" : ""}`}>
-          {lastTouchedBy ? "✦ Updated by AI" : "✦ AI-filled"}
+          {lastTouchedBy === "edit" ? "✦ Updated by AI" : "✦ AI-filled"}
         </span>
       </div>
       <p className="form-hint-lead">
-        Don't type here — describe the visit to the assistant on the right and it fills this form.
+        You don't type here — describe the visit to the assistant on the right and it fills this form.
       </p>
 
       <div className="form-grid">
-        <div className="field">
-          <label>Interaction Type</label>
+        <ReadOnlyField label="Interaction Type">
           <input type="text" value={INTERACTION_TYPE_LABELS[fields.interaction_type] || fields.interaction_type} readOnly />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field">
-          <label>Date</label>
-          <input type="text" value={fields.interaction_date || ""} readOnly />
-        </div>
+        <ReadOnlyField label="Date">
+          <input type="text" value={fields.interaction_date || "—"} readOnly />
+        </ReadOnlyField>
 
-        <div className="field">
-          <label>Time</label>
+        <ReadOnlyField label="Time">
           <input type="text" value={fields.interaction_time || "—"} readOnly />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field">
-          <label>Attendees</label>
+        <ReadOnlyField label="Attendees">
           <TagInput values={fields.attendees || []} readOnly />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field span-2">
-          <label>
-            Topics Discussed <span className="hint">— summarized by the AI</span>
-          </label>
+        <ReadOnlyField label="Topics Discussed" hint="summarized by the AI" span>
           <textarea value={fields.topics_discussed || ""} readOnly placeholder="—" />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field span-2">
-          <label>Outcomes</label>
+        <ReadOnlyField label="Outcomes" span>
           <textarea value={fields.outcomes || ""} readOnly placeholder="—" />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field span-2">
-          <label>
-            HCP Sentiment <span className="hint">— inferred by the AI</span>
-          </label>
+        <ReadOnlyField label="HCP Sentiment" hint="inferred by the AI" span>
           <div className="sentiment-row">
             {SENTIMENTS.map((s) => (
               <div key={s} className={`sentiment-option ${fields.sentiment === s ? `selected ${s}` : ""}`}>
@@ -87,22 +74,19 @@ export default function StructuredForm() {
               </div>
             ))}
           </div>
-        </div>
+        </ReadOnlyField>
 
-        <div className="field span-2">
-          <label>Products Discussed</label>
+        <ReadOnlyField label="Products Discussed" span>
           <TagInput values={fields.products_discussed || []} readOnly />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field">
-          <label>Samples Distributed</label>
+        <ReadOnlyField label="Samples Distributed">
           <TagInput values={fields.samples_dropped || []} readOnly />
-        </div>
+        </ReadOnlyField>
 
-        <div className="field">
-          <label>Materials Shared</label>
+        <ReadOnlyField label="Materials Shared">
           <TagInput values={fields.materials_shared || []} readOnly />
-        </div>
+        </ReadOnlyField>
 
         <div className="field span-2">
           <div className="checkbox-row">
@@ -114,10 +98,9 @@ export default function StructuredForm() {
         </div>
 
         {fields.follow_up_required && (
-          <div className="field span-2">
-            <label>Follow-up Notes</label>
+          <ReadOnlyField label="Follow-up Notes" span>
             <textarea value={fields.follow_up_notes || ""} readOnly placeholder="—" />
-          </div>
+          </ReadOnlyField>
         )}
       </div>
 

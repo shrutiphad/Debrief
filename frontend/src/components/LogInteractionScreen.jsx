@@ -5,7 +5,6 @@ import { resetSession } from "../store/slices/chatSlice";
 import { clearDraft } from "../store/slices/draftSlice";
 import StructuredForm from "./StructuredForm";
 import ChatPanel from "./ChatPanel";
-import AgentTracePanel from "./AgentTracePanel";
 import InteractionHistory from "./InteractionHistory";
 
 export default function LogInteractionScreen() {
@@ -33,18 +32,15 @@ export default function LogInteractionScreen() {
         </div>
       </div>
 
-      {/* Split screen: AI-driven form on the left, assistant chat on the right. */}
+      {/* Split screen: AI-driven form on the left, assistant chat on the right.
+          Sized to fill one screen; each panel scrolls internally, so the page
+          itself doesn't scroll to reveal the form. */}
       <div className="split-screen">
         <StructuredForm />
-        <div className="chat-column">
-          <ChatPanel />
-          <AgentTracePanel />
-        </div>
+        <ChatPanel />
       </div>
 
-      <div className="section-gap">
-        <InteractionHistory />
-      </div>
+      <InteractionHistory />
     </div>
   );
 }

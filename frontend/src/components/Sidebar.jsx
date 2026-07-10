@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectHCP } from "../store/slices/hcpSlice";
+import AgentTracePanel from "./AgentTracePanel";
 
 export default function Sidebar() {
   const dispatch = useDispatch();
@@ -45,6 +46,10 @@ export default function Sidebar() {
             </div>
           </button>
         ))}
+      </div>
+
+      <div className="sidebar-trace">
+        <AgentTracePanel />
       </div>
     </aside>
   );

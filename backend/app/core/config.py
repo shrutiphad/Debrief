@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # --- Groq / LLMs ---
     # Mandatory per the task brief.
     GROQ_API_KEY: str = ""
-    PRIMARY_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"  # agent loop; mandated gemma2-9b-it is decommissioned (README §4)
+    PRIMARY_MODEL: str = "llama-3.3-70b-versatile"  # agent loop; mandated gemma2-9b-it is decommissioned (README §4)
     CONTEXT_MODEL: str = "llama-3.3-70b-versatile"  # used for longer-context reasoning (hcp_insights)
     LLM_TEMPERATURE: float = 0.2
 
