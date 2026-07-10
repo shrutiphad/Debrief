@@ -28,7 +28,7 @@ session without the frontend having to resend full history.
 """
 from datetime import date
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, trim_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -42,6 +42,12 @@ from app.agents.tools import build_tools
 # One process-lifetime checkpointer shared across requests, threads separated by session_id.
 _checkpointer = MemorySaver()
 
+# Cap how much conversation history is re-sent to the LLM each call. The checkpointer
+# keeps the full session, but re-sending all of it every turn burns free-tier tokens-per-
+# minute fast. Keep the most recent messages, always starting on a human turn so an
+# assistant tool-call is never split from its tool result (which the API would reject).
+_HISTORY_MAX_MESSAGES = 16
+
 
 def _should_continue(state: AgentState) -> str:
     last = state["messages"][-1]
@@ -54,7 +60,15 @@ def build_graph(db: AsyncSession):
     llm_with_tools = agent_llm().bind_tools(tools)
 
     async def agent_node(state: AgentState) -> dict:
-        messages = state["messages"]
+        messages = trim_messages(
+            state["messages"],
+            strategy="last",
+            token_counter=len,  # count messages, not tokens — keep the last N
+            max_tokens=_HISTORY_MAX_MESSAGES,
+            start_on="human",
+            include_system=False,
+            allow_partial=False,
+        )
         if not any(isinstance(m, SystemMessage) for m in messages):
             system_prompt = AGENT_SYSTEM_PROMPT.format(today=date.today().isoformat())
             messages = [SystemMessage(content=system_prompt), *messages]

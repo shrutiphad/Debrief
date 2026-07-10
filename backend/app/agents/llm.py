@@ -24,6 +24,10 @@ settings = get_settings()
 # timeouts with exponential backoff up to max_retries before raising.
 _MAX_RETRIES = 3
 _REQUEST_TIMEOUT = 30.0  # seconds per attempt
+# Cap output length. Agent replies are short confirmations and tool-call args, and
+# insights briefings are <90 words — capping tokens keeps each call well under the
+# free-tier tokens-per-minute (TPM) ceiling so we don't get rate-limited mid-turn.
+_MAX_TOKENS = 512
 
 
 @lru_cache
@@ -35,6 +39,7 @@ def get_primary_llm() -> ChatGroq:
         temperature=settings.LLM_TEMPERATURE,
         max_retries=_MAX_RETRIES,
         request_timeout=_REQUEST_TIMEOUT,
+        max_tokens=_MAX_TOKENS,
     )
 
 
@@ -47,6 +52,7 @@ def get_context_llm() -> ChatGroq:
         temperature=settings.LLM_TEMPERATURE,
         max_retries=_MAX_RETRIES,
         request_timeout=_REQUEST_TIMEOUT,
+        max_tokens=_MAX_TOKENS,
     )
 
 
