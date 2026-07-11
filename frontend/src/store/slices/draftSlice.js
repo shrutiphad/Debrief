@@ -2,12 +2,22 @@ import { createSlice } from "@reduxjs/toolkit";
 import { sendChatMessage } from "./chatSlice";
 import { createInteraction } from "./interactionsSlice";
 
+// Browser-LOCAL date/time (not UTC) at the moment of the call — so a logged
+// interaction is stamped with the rep's real local "now", not the server's UTC day.
+function localDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function localTime() {
+  return new Date().toTimeString().slice(0, 5); // HH:MM
+}
+
 // Mirrors the fields the Interaction Details form renders. This is the "draft"
 // the AI assistant fills in — the rep never edits it by hand.
 export const emptyDraft = {
   interaction_type: "visit",
-  interaction_date: new Date().toISOString().slice(0, 10),
-  interaction_time: new Date().toTimeString().slice(0, 5), // HH:MM — auto-filled like the date
+  interaction_date: localDate(),
+  interaction_time: localTime(),
   attendees: [],
   products_discussed: [],
   samples_dropped: [],
@@ -50,11 +60,11 @@ const draftSlice = createSlice({
         if (t.tool === "log_interaction" && t.output?.draft) {
           // log = fill the whole form from scratch
           const filled = mergeDefined({ ...emptyDraft }, t.output.draft);
-          // Auto-log the time alongside the date: if the rep didn't state a time, stamp the
-          // current browser-local time (the server is UTC, so we set it here to stay accurate).
-          if (!t.output.draft.interaction_time) {
-            filled.interaction_time = new Date().toTimeString().slice(0, 5);
-          }
+          // Stamp the creation date AND time at the moment of logging, in the rep's local
+          // timezone, unless the rep explicitly stated one (the backend runs in UTC, so we
+          // set these here to reflect the real local "today").
+          if (!t.output.draft.interaction_date) filled.interaction_date = localDate();
+          if (!t.output.draft.interaction_time) filled.interaction_time = localTime();
           state.fields = filled;
           state.dirty = true;
           state.lastTouchedBy = "log";

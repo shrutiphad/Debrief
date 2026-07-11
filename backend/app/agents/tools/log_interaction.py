@@ -17,8 +17,6 @@ tool — a single log turn already involves several model calls in the agent loo
 and piling on more made the whole pipeline flaky under Groq's free-tier limits.
 Fewer calls = the form fills reliably every time.
 """
-from datetime import date as date_type
-
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,9 +29,12 @@ class LogInteractionInput(BaseModel):
         default="visit",
         description="One of: visit, call, email, conference, sample_drop.",
     )
-    interaction_date: str = Field(
-        default_factory=lambda: date_type.today().isoformat(),
-        description="ISO date (YYYY-MM-DD) the interaction happened. Default to today if not stated.",
+    interaction_date: str | None = Field(
+        default=None,
+        description=(
+            "ISO date YYYY-MM-DD ONLY if the rep explicitly says when it happened (e.g. 'yesterday', "
+            "'last Tuesday'). Otherwise omit — today's date is filled in automatically at the moment of logging."
+        ),
     )
     interaction_time: str | None = Field(default=None, description="HH:MM if the rep states one; else omit (current time is filled automatically).")
     attendees: list[str] = Field(default_factory=list, description="Others present besides the HCP (e.g. a nurse). Never the HCP themselves.")
@@ -58,16 +59,17 @@ def make_log_interaction_tool(db: AsyncSession) -> StructuredTool:
         if sentiment not in _VALID_SENTIMENT:
             sentiment = "neutral"
 
-        # Only pass through a time the rep actually stated. When it's absent we send null and
-        # let the frontend fill the *browser-local* current time — the server runs in UTC, so
-        # doing it here would log a time hours off from the rep's real local time.
+        # Only pass through a date/time the rep actually stated. When absent we send null and let
+        # the frontend stamp the *browser-local* current date/time at the moment of logging — the
+        # server runs in UTC, so doing it here would log a date/time off from the rep's real local day.
         interaction_time = (payload.interaction_time or "").strip() or None
+        interaction_date = (payload.interaction_date or "").strip() or None
 
         # The draft mirrors the fields the left-hand form renders, so the frontend
         # can drop it straight in. No LLM calls here — the agent already did the work.
         draft = {
             "interaction_type": payload.interaction_type,
-            "interaction_date": payload.interaction_date,
+            "interaction_date": interaction_date,
             "interaction_time": interaction_time,
             "attendees": payload.attendees,
             "products_discussed": payload.products_discussed,
