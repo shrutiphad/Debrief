@@ -50,7 +50,7 @@ async def chat(payload: ChatMessageIn, db: AsyncSession = Depends(get_db)):
             model_used="none",
         )
 
-    graph = build_graph(db)
+    graph = build_graph(db, payload.hcp_id)
     config = {"configurable": {"thread_id": payload.session_id}}
 
     context_prefix = f"[Active HCP context: hcp_id={payload.hcp_id}] " if payload.hcp_id else ""

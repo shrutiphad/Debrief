@@ -17,19 +17,43 @@ from app.db.models import FollowUp, Interaction
 
 
 class ScheduleFollowupInput(BaseModel):
-    interaction_id: str = Field(description="The interaction this follow-up relates to.")
     due_date: str = Field(description="ISO date YYYY-MM-DD the follow-up is due.")
     notes: str = Field(description="What needs to happen, e.g. 'Send elderly-dosing study PDF'.")
+    interaction_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional. The interaction this follow-up relates to. If you don't have one, omit it — "
+            "the follow-up attaches to this HCP's most recent interaction automatically."
+        ),
+    )
 
 
-def make_schedule_followup_tool(db: AsyncSession) -> StructuredTool:
+def make_schedule_followup_tool(db: AsyncSession, hcp_id: str | None = None) -> StructuredTool:
     async def _run(**kwargs) -> dict:
         payload = ScheduleFollowupInput(**kwargs)
 
-        result = await db.execute(select(Interaction).where(Interaction.id == payload.interaction_id))
-        interaction = result.scalar_one_or_none()
+        # 1) Use the id the agent gave, if it resolves. 2) Otherwise fall back to the active
+        # HCP's most recent interaction — so the agent never has to guess an id (which used to
+        # cause an error + a wasted recovery round-trip).
+        interaction = None
+        if payload.interaction_id:
+            interaction = (
+                await db.execute(select(Interaction).where(Interaction.id == payload.interaction_id))
+            ).scalar_one_or_none()
+        if interaction is None and hcp_id:
+            interaction = (
+                await db.execute(
+                    select(Interaction)
+                    .where(Interaction.hcp_id == hcp_id)
+                    .order_by(Interaction.interaction_date.desc(), Interaction.created_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
         if interaction is None:
-            return {"status": "error", "message": f"No interaction found with id {payload.interaction_id}"}
+            return {
+                "status": "error",
+                "message": "No interaction to attach the follow-up to yet — log an interaction for this HCP first.",
+            }
 
         follow_up = FollowUp(
             interaction_id=interaction.id,
@@ -54,7 +78,10 @@ def make_schedule_followup_tool(db: AsyncSession) -> StructuredTool:
 
     return StructuredTool.from_function(
         name="schedule_followup",
-        description="Create a follow-up task tied to a logged interaction, with a due date and what needs to happen.",
+        description=(
+            "Create a follow-up task for the current HCP with a due date and what needs to happen. "
+            "You don't need an interaction id — it attaches to the HCP's most recent interaction automatically."
+        ),
         args_schema=ScheduleFollowupInput,
         coroutine=_run,
     )

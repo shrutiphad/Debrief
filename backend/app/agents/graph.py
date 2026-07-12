@@ -54,9 +54,9 @@ def _should_continue(state: AgentState) -> str:
     return "tools" if getattr(last, "tool_calls", None) else "end"
 
 
-def build_graph(db: AsyncSession):
+def build_graph(db: AsyncSession, hcp_id: str | None = None):
     """Compile a fresh graph bound to this request's DB session and tool set."""
-    tools = build_tools(db)
+    tools = build_tools(db, hcp_id)
     llm_with_tools = agent_llm().bind_tools(tools)
 
     async def agent_node(state: AgentState) -> dict:
