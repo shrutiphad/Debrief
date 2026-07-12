@@ -51,6 +51,13 @@ const draftSlice = createSlice({
       state.dirty = false;
       state.lastTouchedBy = null;
     },
+    // Manual edit of a single field by the rep, before they log the interaction.
+    // The AI fills the form, but the rep can still correct or complete anything here.
+    setField(state, action) {
+      const { key, value } = action.payload;
+      state.fields[key] = value;
+      state.dirty = true;
+    },
   },
   extraReducers: (builder) => {
     // When a chat turn comes back, apply whatever the log/edit tools staged.
@@ -85,5 +92,5 @@ const draftSlice = createSlice({
   },
 });
 
-export const { clearDraft } = draftSlice.actions;
+export const { clearDraft, setField } = draftSlice.actions;
 export default draftSlice.reducer;

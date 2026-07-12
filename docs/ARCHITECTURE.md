@@ -124,3 +124,18 @@ erDiagram
         string status
     }
 ```
+
+
+
+
+
+1. GitHub Submission
+Upload your frontend and backend code in one GitHub repository.
+Add a clear README.md explaining your project and how to run it.
+Share the GitHub repository link using the submission link at the end of this document.
+2. Video Recording (10–15 minutes)
+ In your video, include:
+A walkthrough of your frontend (show how it works).
+A demo of all 5 LangGraph tools working properly.
+A simple explanation of your code and how your project is structured.
+A brief summary of what you understood from the task.

@@ -610,27 +610,11 @@ textarea:focus-visible {
   background: var(--accent);
 }
 
-.form-panel input[readonly],
-.form-panel textarea[readonly] {
-  background: var(--surface-sunken);
-  color: var(--ink);
-  cursor: default;
-}
-
-.form-panel input[readonly]:focus-visible,
-.form-panel textarea[readonly]:focus-visible {
-  outline: none;
-  border-color: var(--border);
-}
-
-.form-panel .sentiment-option {
-  cursor: default;
-}
-
-.tag-input-row.readonly {
-  background: var(--surface-sunken);
-  min-height: 38px;
-  align-items: center;
+/* The AI fills these, but they stay editable — keep normal interactive affordances. */
+.form-panel select,
+.form-panel input,
+.form-panel textarea {
+  background: var(--surface);
 }
 
 .tag-empty {

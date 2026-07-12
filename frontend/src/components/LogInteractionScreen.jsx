@@ -32,9 +32,6 @@ export default function LogInteractionScreen() {
         </div>
       </div>
 
-      {/* Split screen: AI-driven form on the left, assistant chat on the right.
-          Sized to fill one screen; each panel scrolls internally, so the page
-          itself doesn't scroll to reveal the form. */}
       <div className="split-screen">
         <StructuredForm />
         <ChatPanel />
