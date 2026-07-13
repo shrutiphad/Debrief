@@ -5,9 +5,8 @@ Healthcare Professional (HCP) touchpoints via **either** a structured form **or*
 conversational AI agent — built on **React + Redux**, **FastAPI**, **LangGraph**, and **Groq**
 (`llama-3.3-70b-versatile` — the brief's mandated `gemma2-9b-it` has since been decommissioned by
 Groq; see [§4](#4-langgraph-agent--tools)).
+— "AI-First CRM HCP Module: Log Interaction
 
-> Built for the AVIOAI Round 1 technical assignment — "AI-First CRM HCP Module: Log Interaction
-> Screen."
 
 ---
 

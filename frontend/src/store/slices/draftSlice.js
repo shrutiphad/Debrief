@@ -2,8 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import { sendChatMessage } from "./chatSlice";
 import { createInteraction } from "./interactionsSlice";
 
-// Browser-LOCAL date/time (not UTC) at the moment of the call — so a logged
-// interaction is stamped with the rep's real local "now", not the server's UTC day.
+
 function localDate() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -12,8 +11,6 @@ function localTime() {
   return new Date().toTimeString().slice(0, 5); // HH:MM
 }
 
-// Mirrors the fields the Interaction Details form renders. This is the "draft"
-// the AI assistant fills in — the rep never edits it by hand.
 export const emptyDraft = {
   interaction_type: "visit",
   interaction_date: localDate(),
